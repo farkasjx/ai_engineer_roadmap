@@ -19,6 +19,7 @@
       --line: rgba(255, 255, 255, 0.18);
       --shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
       --radius: 28px;
+      --sidebar-width: 420px;
     }
 
     * { box-sizing: border-box; }
@@ -34,6 +35,7 @@
         radial-gradient(circle at 82% 20%, rgba(192, 132, 252, 0.18), transparent 30%),
         radial-gradient(circle at 48% 88%, rgba(52, 211, 153, 0.14), transparent 30%),
         linear-gradient(135deg, #05070d, var(--bg));
+      touch-action: none;
     }
 
     .app {
@@ -41,7 +43,7 @@
       width: 100vw;
       height: 100vh;
       display: grid;
-      grid-template-columns: 1fr 390px;
+      grid-template-columns: minmax(0, 1fr) var(--sidebar-width);
     }
 
     header {
@@ -117,17 +119,44 @@
       position: relative;
       overflow: hidden;
       height: 100vh;
+      cursor: grab;
+      user-select: none;
+    }
+
+    .map-wrap.dragging {
+      cursor: grabbing;
+    }
+
+    .map-wrap::after {
+      content: "Húzd az egérrel a térképet · görgővel zoom · node-ra kattintva fókusz";
+      position: absolute;
+      right: 18px;
+      bottom: 18px;
+      z-index: 12;
+      padding: 9px 12px;
+      border-radius: 999px;
+      background: rgba(0,0,0,0.32);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: var(--muted);
+      font-size: 12px;
+      pointer-events: none;
+      backdrop-filter: blur(12px);
     }
 
     .map {
       position: absolute;
-      left: 50%;
-      top: 50%;
+      left: 0;
+      top: 0;
       width: 2200px;
       height: 1400px;
-      transform-origin: center center;
-      transform: translate(-50%, -50%) scale(0.62);
-      transition: transform 900ms cubic-bezier(.18,.89,.32,1.08);
+      transform-origin: 0 0;
+      transform: translate(0, 0) scale(0.62);
+      transition: transform 650ms cubic-bezier(.18,.89,.32,1.08);
+      will-change: transform;
+    }
+
+    .map.no-transition {
+      transition: none;
     }
 
     svg.connections {
@@ -233,6 +262,37 @@
       backdrop-filter: blur(24px);
       overflow: auto;
       z-index: 25;
+      min-width: 320px;
+    }
+
+    .resize-handle {
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      right: var(--sidebar-width);
+      width: 10px;
+      z-index: 60;
+      cursor: col-resize;
+      background: transparent;
+    }
+
+    .resize-handle::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 4px;
+      height: 68px;
+      transform: translate(-50%, -50%);
+      border-radius: 999px;
+      background: rgba(255,255,255,0.18);
+      transition: background .2s ease, height .2s ease;
+    }
+
+    .resize-handle:hover::before,
+    body.resizing .resize-handle::before {
+      height: 120px;
+      background: rgba(125,211,252,0.65);
     }
 
     .panel {
@@ -597,17 +657,104 @@
     #importFile { display: none; }
 
     @media (max-width: 1100px) {
-      .app { grid-template-columns: 1fr; }
-      .details {
-        position: fixed;
-        right: 14px;
-        bottom: 14px;
-        width: min(420px, calc(100vw - 28px));
-        height: 48vh;
-        border: 1px solid rgba(255,255,255,0.12);
-        border-radius: 30px;
-        padding: 12px;
+      body {
+        overflow: auto;
+        touch-action: auto;
       }
+
+      .app {
+        min-height: 100vh;
+        height: auto;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .map-wrap {
+        height: 68vh;
+        min-height: 520px;
+        order: 1;
+      }
+
+      .map-wrap::after {
+        content: "Húzd a térképet · koppints a node-okra";
+        left: 16px;
+        right: auto;
+        bottom: 16px;
+      }
+
+      .details {
+        position: relative;
+        order: 2;
+        width: 100%;
+        height: auto;
+        min-height: 52vh;
+        border-left: none;
+        border-top: 1px solid rgba(255,255,255,0.12);
+        border-radius: 30px 30px 0 0;
+        padding: 14px;
+      }
+
+      .panel {
+        min-height: auto;
+        padding: 20px;
+      }
+
+      header {
+        position: absolute;
+        left: 18px;
+        top: 18px;
+        max-width: calc(100vw - 36px);
+      }
+
+      h1 { font-size: 38px; }
+      header p, .legend, .dashboard { display: none; }
+
+      .toolbar {
+        position: sticky;
+        left: auto;
+        bottom: auto;
+        top: 0;
+        order: 0;
+        z-index: 80;
+        padding: 10px;
+        max-width: none;
+        width: 100%;
+        background: rgba(5,8,16,0.74);
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+        backdrop-filter: blur(18px);
+      }
+
+      button, .chip {
+        padding: 9px 10px;
+        font-size: 12px;
+      }
+
+      .resize-handle { display: none; }
+      .status-row { grid-template-columns: 1fr; }
+      .metric-grid { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (max-width: 640px) {
+      .map-wrap {
+        height: 62vh;
+        min-height: 460px;
+      }
+
+      h1 { font-size: 30px; letter-spacing: -0.05em; }
+      .eyebrow { font-size: 11px; }
+      .node {
+        width: 230px;
+        min-height: 140px;
+        padding: 18px;
+      }
+      .panel h3 { font-size: 26px; }
+      .toolbar { gap: 7px; }
+      .toolbar button:nth-of-type(4),
+      .toolbar button:nth-of-type(5),
+      .toolbar button:nth-of-type(6) {
+        display: none;
+      }
+    }
       .panel { min-height: auto; padding: 20px; }
       header { left: 18px; top: 18px; max-width: calc(100vw - 36px); }
       h1 { font-size: 42px; }
@@ -634,7 +781,7 @@
 
     <section class="dashboard" id="dashboard"></section>
 
-    <main class="map-wrap">
+    <main class="map-wrap" id="mapWrap">
       <div class="map" id="map">
         <svg class="connections" viewBox="0 0 2200 1400" preserveAspectRatio="none">
           <path class="path" d="M260 520 C470 210, 760 190, 930 360 S1270 560, 1460 340 S1810 300, 1960 560" />
@@ -644,6 +791,8 @@
         </svg>
       </div>
     </main>
+
+    <div class="resize-handle" id="resizeHandle" title="Oldalsáv méretezése"></div>
 
     <aside class="details">
       <div class="panel" id="details"></div>
@@ -1057,11 +1206,17 @@
     }
 
     const map = document.getElementById('map');
+    const mapWrap = document.getElementById('mapWrap');
     const details = document.getElementById('details');
     const counter = document.getElementById('counter');
     const dashboard = document.getElementById('dashboard');
+    const resizeHandle = document.getElementById('resizeHandle');
     let activeIndex = 0;
     let activeFilter = "all";
+    let viewport = { x: 0, y: 0, scale: 0.62 };
+    let isDraggingMap = false;
+    let dragStart = { x: 0, y: 0, vx: 0, vy: 0 };
+    let isResizingSidebar = false;
 
     function createNodes() {
       roadmap.forEach((item, index) => {
@@ -1140,6 +1295,16 @@
       counter.textContent = `${index + 1} / ${roadmap.length}`;
     }
 
+    function setMapTransform({ animate = true } = {}) {
+      map.classList.toggle('no-transition', !animate);
+      map.style.transform = `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.scale})`;
+      if (!animate) requestAnimationFrame(() => map.classList.remove('no-transition'));
+    }
+
+    function getMapAreaWidth() {
+      return mapWrap.clientWidth;
+    }
+
     function focusNode(index) {
       activeIndex = index;
       const item = roadmap[index];
@@ -1148,26 +1313,26 @@
       activeNode.classList.add('active');
       activeNode.dataset.status = getStatus(item.id);
 
-      const viewportCenterX = window.innerWidth > 1100 ? (window.innerWidth - 390) / 2 : window.innerWidth / 2;
-      const viewportCenterY = window.innerHeight / 2;
-      const scale = window.innerWidth > 1100 ? 1.05 : 0.78;
+      const isMobile = window.innerWidth <= 1100;
+      viewport.scale = isMobile ? 0.55 : 1.0;
+      const viewportCenterX = getMapAreaWidth() / 2;
+      const viewportCenterY = mapWrap.clientHeight / 2;
       const nodeCenterX = item.x + 125;
       const nodeCenterY = item.y + 75;
-      const tx = viewportCenterX - nodeCenterX * scale;
-      const ty = viewportCenterY - nodeCenterY * scale;
+      viewport.x = viewportCenterX - nodeCenterX * viewport.scale;
+      viewport.y = viewportCenterY - nodeCenterY * viewport.scale;
 
-      map.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
-      map.style.left = '0';
-      map.style.top = '0';
+      setMapTransform({ animate: true });
       renderDetails(item, index);
+      renderDashboard();
     }
 
     function resetView() {
-      map.style.left = '50%';
-      map.style.top = '50%';
-      map.style.transform = window.innerWidth > 1100
-        ? 'translate(-50%, -50%) scale(0.62)'
-        : 'translate(-50%, -50%) scale(0.42)';
+      const isMobile = window.innerWidth <= 1100;
+      viewport.scale = isMobile ? 0.42 : 0.62;
+      viewport.x = (getMapAreaWidth() - 2200 * viewport.scale) / 2;
+      viewport.y = (mapWrap.clientHeight - 1400 * viewport.scale) / 2;
+      setMapTransform({ animate: true });
     }
 
     function nextNode() {
@@ -1184,11 +1349,92 @@
       if (event.key === 'Escape') resetView();
     });
 
-    window.addEventListener('resize', () => focusNode(activeIndex));
+    function initMapDragging() {
+      mapWrap.addEventListener('pointerdown', (event) => {
+        if (event.target.closest('.node') || event.target.closest('button') || event.target.closest('input') || event.target.closest('textarea')) return;
+        isDraggingMap = true;
+        mapWrap.classList.add('dragging');
+        map.setPointerCapture?.(event.pointerId);
+        dragStart = { x: event.clientX, y: event.clientY, vx: viewport.x, vy: viewport.y };
+        map.classList.add('no-transition');
+      });
+
+      window.addEventListener('pointermove', (event) => {
+        if (isResizingSidebar) {
+          const min = 320;
+          const max = Math.min(720, window.innerWidth * 0.55);
+          const nextWidth = Math.max(min, Math.min(max, window.innerWidth - event.clientX));
+          document.documentElement.style.setProperty('--sidebar-width', `${nextWidth}px`);
+          localStorage.setItem(`${STORAGE_PREFIX}sidebarWidth`, String(nextWidth));
+          return;
+        }
+
+        if (!isDraggingMap) return;
+        viewport.x = dragStart.vx + (event.clientX - dragStart.x);
+        viewport.y = dragStart.vy + (event.clientY - dragStart.y);
+        setMapTransform({ animate: false });
+      });
+
+      window.addEventListener('pointerup', () => {
+        if (isDraggingMap) {
+          isDraggingMap = false;
+          mapWrap.classList.remove('dragging');
+          map.classList.remove('no-transition');
+        }
+        if (isResizingSidebar) {
+          isResizingSidebar = false;
+          document.body.classList.remove('resizing');
+          renderDashboard();
+        }
+      });
+
+      mapWrap.addEventListener('wheel', (event) => {
+        event.preventDefault();
+        const rect = mapWrap.getBoundingClientRect();
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+        const prevScale = viewport.scale;
+        const zoomFactor = event.deltaY > 0 ? 0.9 : 1.1;
+        const minScale = window.innerWidth <= 1100 ? 0.35 : 0.38;
+        const maxScale = window.innerWidth <= 1100 ? 1.1 : 1.45;
+        const nextScale = Math.max(minScale, Math.min(maxScale, prevScale * zoomFactor));
+        const worldX = (mouseX - viewport.x) / prevScale;
+        const worldY = (mouseY - viewport.y) / prevScale;
+        viewport.scale = nextScale;
+        viewport.x = mouseX - worldX * nextScale;
+        viewport.y = mouseY - worldY * nextScale;
+        setMapTransform({ animate: false });
+      }, { passive: false });
+    }
+
+    function initSidebarResize() {
+      const savedWidth = Number(localStorage.getItem(`${STORAGE_PREFIX}sidebarWidth`));
+      if (savedWidth && window.innerWidth > 1100) {
+        document.documentElement.style.setProperty('--sidebar-width', `${Math.max(320, Math.min(720, savedWidth))}px`);
+      }
+
+      resizeHandle.addEventListener('pointerdown', (event) => {
+        if (window.innerWidth <= 1100) return;
+        isResizingSidebar = true;
+        document.body.classList.add('resizing');
+        event.preventDefault();
+      });
+    }
+
+    window.addEventListener('resize', () => {
+      if (window.innerWidth <= 1100) {
+        document.documentElement.style.removeProperty('--sidebar-width');
+      }
+      resetView();
+      renderDashboard();
+    });
 
     createNodes();
+    initMapDragging();
+    initSidebarResize();
     renderDashboard();
     applyFilter("all");
+    resetView();
     focusNode(0);
   </script>
 </body>
