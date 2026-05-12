@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Mérnök Roadmap — Interaktív térkép</title>
+  <style>
+    :root {
+      --bg: #070b14;
+      --bg-2: #0d1424;
+      --card: rgba(255, 255, 255, 0.08);
+      --card-strong: rgba(255, 255, 255, 0.14);
+      --text: #eef4ff;
+      --muted: #a9b7d0;
+      --accent: #7dd3fc;
+      --accent-2: #c084fc;
+      --accent-3: #34d399;
+      --danger: #fb7185;
+      --line: rgba(255, 255, 255, 0.18);
+      --shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+      --radius: 28px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      overflow: hidden;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 15% 10%, rgba(125, 211, 252, 0.22), transparent 28%),
+        radial-gradient(circle at 82% 20%, rgba(192, 132, 252, 0.18), transparent 30%),
+        radial-gradient(circle at 48% 88%, rgba(52, 211, 153, 0.14), transparent 30%),
+        linear-gradient(135deg, #05070d, var(--bg));
+    }
+
+    .app {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      display: grid;
+      grid-template-columns: 1fr 390px;
+    }
+
+    header {
+      position: fixed;
+      top: 24px;
+      left: 28px;
+      z-index: 20;
+      max-width: 660px;
+      pointer-events: none;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 12px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--accent);
+      font-size: 13px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      backdrop-filter: blur(16px);
+    }
+
+    h1 {
+      margin: 16px 0 8px;
+      font-size: clamp(34px, 5vw, 72px);
+      line-height: 0.92;
+      letter-spacing: -0.07em;
+    }
+
+    header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.55;
+      max-width: 560px;
+    }
+
+    .toolbar {
+      position: fixed;
+      left: 28px;
+      bottom: 24px;
+      z-index: 30;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    button, .chip {
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.08);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 11px 14px;
+      font-weight: 700;
+      cursor: pointer;
+      backdrop-filter: blur(14px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      transition: transform .2s ease, background .2s ease, border-color .2s ease;
+    }
+
+    button:hover, .chip:hover {
+      transform: translateY(-2px);
+      background: rgba(255,255,255,0.14);
+      border-color: rgba(125,211,252,0.45);
+    }
+
+    .map-wrap {
+      position: relative;
+      overflow: hidden;
+      height: 100vh;
+    }
+
+    .map {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 2200px;
+      height: 1400px;
+      transform-origin: center center;
+      transform: translate(-50%, -50%) scale(0.62);
+      transition: transform 900ms cubic-bezier(.18,.89,.32,1.08);
+    }
+
+    svg.connections {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      opacity: 0.72;
+    }
+
+    .path {
+      fill: none;
+      stroke: var(--line);
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-dasharray: 8 12;
+    }
+
+    .node {
+      position: absolute;
+      width: 250px;
+      min-height: 150px;
+      border-radius: var(--radius);
+      padding: 20px;
+      border: 1px solid rgba(255,255,255,0.16);
+      background: linear-gradient(145deg, rgba(255,255,255,0.14), rgba(255,255,255,0.055));
+      box-shadow: var(--shadow);
+      cursor: pointer;
+      backdrop-filter: blur(22px);
+      transition: transform 260ms ease, border-color 260ms ease, background 260ms ease, box-shadow 260ms ease;
+      overflow: hidden;
+    }
+
+    .node::before {
+      content: "";
+      position: absolute;
+      inset: -2px;
+      background: radial-gradient(circle at 20% 0%, var(--node-color), transparent 42%);
+      opacity: 0.28;
+      pointer-events: none;
+    }
+
+    .node:hover {
+      transform: translateY(-8px) scale(1.03);
+      border-color: color-mix(in srgb, var(--node-color) 75%, white 25%);
+      background: linear-gradient(145deg, rgba(255,255,255,0.2), rgba(255,255,255,0.08));
+    }
+
+    .node.active {
+      transform: translateY(-10px) scale(1.08);
+      border-color: var(--node-color);
+      box-shadow: 0 30px 120px color-mix(in srgb, var(--node-color) 30%, transparent 70%);
+    }
+
+    .node .index {
+      position: relative;
+      display: inline-flex;
+      width: 38px;
+      height: 38px;
+      border-radius: 14px;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      background: color-mix(in srgb, var(--node-color) 28%, rgba(255,255,255,0.1) 72%);
+      color: white;
+      margin-bottom: 16px;
+    }
+
+    .node h2 {
+      position: relative;
+      margin: 0 0 8px;
+      font-size: 20px;
+      letter-spacing: -0.03em;
+    }
+
+    .node p {
+      position: relative;
+      margin: 0;
+      color: var(--muted);
+      font-size: 13.5px;
+      line-height: 1.45;
+    }
+
+    .node .tag {
+      position: relative;
+      display: inline-block;
+      margin-top: 14px;
+      padding: 6px 9px;
+      border-radius: 999px;
+      background: rgba(0,0,0,0.22);
+      color: color-mix(in srgb, var(--node-color) 70%, white 30%);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .details {
+      position: relative;
+      height: 100vh;
+      padding: 24px;
+      border-left: 1px solid rgba(255,255,255,0.12);
+      background: rgba(5, 8, 16, 0.68);
+      backdrop-filter: blur(24px);
+      overflow: auto;
+      z-index: 25;
+    }
+
+    .panel {
+      min-height: calc(100vh - 48px);
+      border-radius: 32px;
+      padding: 28px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.11), rgba(255,255,255,0.045));
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: var(--shadow);
+    }
+
+    .panel .phase {
+      color: var(--accent);
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      font-size: 12px;
+    }
+
+    .panel h3 {
+      margin: 12px 0 10px;
+      font-size: 32px;
+      line-height: 1.05;
+      letter-spacing: -0.05em;
+    }
+
+    .panel .summary {
+      color: var(--muted);
+      line-height: 1.6;
+      margin-bottom: 22px;
+    }
+
+    .section-title {
+      margin: 24px 0 10px;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--accent-3);
+      font-weight: 900;
+    }
+
+    ul {
+      padding-left: 19px;
+      margin: 8px 0;
+      color: #dce7fb;
+    }
+
+    li {
+      margin: 8px 0;
+      line-height: 1.45;
+    }
+
+    .project-card {
+      margin-top: 14px;
+      padding: 18px;
+      border-radius: 22px;
+      background: rgba(0,0,0,0.22);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .project-card strong {
+      color: white;
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .long-description {
+      display: grid;
+      gap: 12px;
+      margin: 18px 0 22px;
+    }
+
+    .long-description p {
+      margin: 0;
+      color: #dce7fb;
+      line-height: 1.65;
+      font-size: 15px;
+    }
+
+    .status-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin: 18px 0 20px;
+    }
+
+    .status-option {
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 18px;
+      padding: 10px 9px;
+      background: rgba(255,255,255,0.055);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+      text-align: center;
+      cursor: pointer;
+      transition: all .2s ease;
+      user-select: none;
+    }
+
+    .status-option.active {
+      color: white;
+      border-color: var(--accent);
+      background: rgba(125,211,252,0.18);
+      box-shadow: 0 0 24px rgba(125,211,252,0.16);
+    }
+
+    .node-status {
+      position: absolute;
+      right: 16px;
+      top: 16px;
+      z-index: 2;
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      border: 2px solid rgba(255,255,255,0.55);
+      background: rgba(255,255,255,0.12);
+      box-shadow: 0 0 18px rgba(255,255,255,0.08);
+    }
+
+    .node[data-status="open"] .node-status { background: rgba(255,255,255,0.18); }
+    .node[data-status="in-progress"] .node-status { background: #facc15; box-shadow: 0 0 22px rgba(250,204,21,0.5); }
+    .node[data-status="resolved"] .node-status { background: #34d399; box-shadow: 0 0 22px rgba(52,211,153,0.5); }
+    .node[data-status="resolved"] { opacity: .82; }
+
+    .checklist {
+      display: grid;
+      gap: 9px;
+      margin-top: 10px;
+    }
+
+    .check-item {
+      display: grid;
+      grid-template-columns: 22px 1fr;
+      gap: 10px;
+      align-items: start;
+      padding: 12px;
+      border-radius: 16px;
+      background: rgba(0,0,0,0.18);
+      border: 1px solid rgba(255,255,255,0.08);
+      cursor: pointer;
+    }
+
+    .check-item input {
+      margin-top: 2px;
+      width: 17px;
+      height: 17px;
+      accent-color: #34d399;
+    }
+
+    .check-item span {
+      color: #dce7fb;
+      line-height: 1.45;
+      font-size: 14px;
+    }
+
+    .check-item.done span {
+      color: var(--muted);
+      text-decoration: line-through;
+    }
+
+    .detail-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .meta-note {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+      margin-top: 10px;
+    }
+
+    .progress {
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      gap: 5px;
+      margin: 18px 0 22px;
+    }
+
+    .bar {
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.12);
+    }
+
+    .bar.on { background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+
+    .legend {
+      position: fixed;
+      left: 28px;
+      top: 220px;
+      z-index: 18;
+      display: grid;
+      gap: 8px;
+      width: 230px;
+      pointer-events: none;
+    }
+
+    .legend-item {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 13px;
+      background: rgba(255,255,255,0.045);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 999px;
+      padding: 8px 11px;
+      backdrop-filter: blur(12px);
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--dot);
+      box-shadow: 0 0 18px var(--dot);
+    }
+
+    .dashboard {
+      position: fixed;
+      left: 28px;
+      top: 405px;
+      z-index: 22;
+      width: 330px;
+      padding: 16px;
+      border-radius: 26px;
+      background: rgba(5, 8, 16, 0.62);
+      border: 1px solid rgba(255,255,255,0.12);
+      backdrop-filter: blur(20px);
+      box-shadow: var(--shadow);
+    }
+
+    .dashboard h4 {
+      margin: 0 0 12px;
+      font-size: 15px;
+      letter-spacing: -0.02em;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .metric {
+      border-radius: 18px;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.08);
+      padding: 10px;
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 20px;
+      line-height: 1;
+      margin-bottom: 5px;
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+
+    .progress-track {
+      height: 10px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.1);
+      margin: 10px 0 14px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2), var(--accent-3));
+      transition: width .3s ease;
+    }
+
+    .filters {
+      display: flex;
+      gap: 7px;
+      flex-wrap: wrap;
+      margin: 10px 0 12px;
+    }
+
+    .filter-btn {
+      padding: 8px 10px;
+      font-size: 11px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.055);
+      color: var(--muted);
+      cursor: pointer;
+      font-weight: 900;
+    }
+
+    .filter-btn.active {
+      color: white;
+      border-color: rgba(125,211,252,0.55);
+      background: rgba(125,211,252,0.18);
+    }
+
+    .next-action {
+      padding: 12px;
+      border-radius: 18px;
+      background: rgba(0,0,0,0.22);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: #dce7fb;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .next-action strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--accent-3);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      font-size: 11px;
+    }
+
+    .node.hidden-by-filter {
+      opacity: .14;
+      pointer-events: none;
+      transform: scale(.92);
+    }
+
+    textarea.notes {
+      width: 100%;
+      min-height: 130px;
+      resize: vertical;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 18px;
+      padding: 14px;
+      color: var(--text);
+      background: rgba(0,0,0,0.22);
+      outline: none;
+      font: inherit;
+      line-height: 1.5;
+    }
+
+    textarea.notes:focus {
+      border-color: rgba(125,211,252,0.55);
+      box-shadow: 0 0 0 4px rgba(125,211,252,0.08);
+    }
+
+    .resource-list a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 800;
+    }
+
+    .resource-list a:hover { text-decoration: underline; }
+
+    #importFile { display: none; }
+
+    @media (max-width: 1100px) {
+      .app { grid-template-columns: 1fr; }
+      .details {
+        position: fixed;
+        right: 14px;
+        bottom: 14px;
+        width: min(420px, calc(100vw - 28px));
+        height: 48vh;
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 30px;
+        padding: 12px;
+      }
+      .panel { min-height: auto; padding: 20px; }
+      header { left: 18px; top: 18px; max-width: calc(100vw - 36px); }
+      h1 { font-size: 42px; }
+      header p, .legend, .dashboard { display: none; }
+      .toolbar { left: 18px; bottom: 18px; max-width: calc(100vw - 36px); }
+      .map { transform: translate(-50%, -50%) scale(0.42); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="eyebrow">AI Engineer Roadmap · gyakorlati kurzustérkép</div>
+      <h1>Középszintig vezető AI mérnök útvonal</h1>
+      <p>Kattints a modulokra: a térkép fókuszál az adott témára, a jobb oldali panel pedig mutatja a készségeket, eszközöket és portfólióprojektet.</p>
+    </header>
+
+    <div class="legend">
+      <div class="legend-item"><span class="dot" style="--dot:#7dd3fc"></span>Software / backend alap</div>
+      <div class="legend-item"><span class="dot" style="--dot:#34d399"></span>ML, RAG és adatrendszerek</div>
+      <div class="legend-item"><span class="dot" style="--dot:#c084fc"></span>LLM, agent, production</div>
+      <div class="legend-item"><span class="dot" style="--dot:#fb7185"></span>Portfólió és interjú</div>
+    </div>
+
+    <section class="dashboard" id="dashboard"></section>
+
+    <main class="map-wrap">
+      <div class="map" id="map">
+        <svg class="connections" viewBox="0 0 2200 1400" preserveAspectRatio="none">
+          <path class="path" d="M260 520 C470 210, 760 190, 930 360 S1270 560, 1460 340 S1810 300, 1960 560" />
+          <path class="path" d="M280 780 C560 1100, 860 1030, 1090 820 S1430 700, 1660 900 S1920 1110, 2050 900" />
+          <path class="path" d="M930 360 C880 590, 980 740, 1090 820" />
+          <path class="path" d="M1460 340 C1390 540, 1480 730, 1660 900" />
+        </svg>
+      </div>
+    </main>
+
+    <aside class="details">
+      <div class="panel" id="details"></div>
+    </aside>
+  </div>
+
+  <div class="toolbar">
+    <button onclick="resetView()">Teljes térkép</button>
+    <button onclick="prevNode()">← Előző</button>
+    <button onclick="nextNode()">Következő →</button>
+    <button onclick="exportProgress()">Export JSON</button>
+    <button onclick="document.getElementById('importFile').click()">Import JSON</button>
+    <button onclick="resetProgress()">Progress törlése</button>
+    <input id="importFile" type="file" accept="application/json" onchange="importProgress(event)" />
+    <span class="chip" id="counter">1 / 10</span>
+  </div>
+
+  <script>
+    const roadmap = [
+      {
+        id: "software",
+        phase: "1. fázis",
+        title: "Python + Backend alapok",
+        short: "Modern Python, FastAPI, PostgreSQL, Docker és GitHub workflow.",
+        tag: "3–5 hét",
+        color: "#7dd3fc",
+        x: 150,
+        y: 450,
+        progress: 1,
+        summary: "Az AI mérnök nem csak notebookban dolgozik. Ezen a szinten stabil, tesztelhető, konténerizált backend alapokat építesz.",
+        description: [
+          "Ebben a modulban a cél az, hogy az AI-rendszereket ne különálló kísérletekként, hanem valódi szoftvertermékekként tudd kezelni. A legtöbb munkahelyen az AI funkció egy API, egy háttérrendszer, egy adatbázis és egy jogosultsági réteg részeként működik, ezért a backend alapok kritikusak.",
+          "Meg kell tanulnod tiszta Python projektstruktúrát kialakítani, konfigurációt és titkokat kezelni, hibákat logolni, teszteket írni és Dockerrel reprodukálható környezetet készíteni. Ez lesz minden későbbi LLM, RAG és agent projekt stabil alapja.",
+          "A modul végére képesnek kell lenned egy olyan FastAPI szolgáltatást építeni, amely adatot fogad, validál, adatbázisba ment, dokumentációt generál, és konténerből futtatható. Ez a minimum ahhoz, hogy AI prototípusból production-szerű szolgáltatás legyen."
+        ],
+        skills: ["Python typing, pydantic, async alapok", "FastAPI REST API-k", "PostgreSQL, Redis, SQLAlchemy/SQLModel", "Docker, Docker Compose", "Git, GitHub Actions, alap tesztek"],
+        tools: ["Python", "FastAPI", "PostgreSQL", "Redis", "Docker", "GitHub Actions"],
+        checklist: ["Hozz létre modern Python projektet uv/poetry használatával.", "Építs FastAPI CRUD API-t validációval és hibakezeléssel.", "Kösd össze PostgreSQL-lel és készíts migrációs stratégiát.", "Dockerizáld az alkalmazást Docker Compose-zal.", "Írj legalább 5 unit vagy integration tesztet.", "Készíts GitHub Actions workflow-t tesztelésre és lintre."],
+        project: "Dockerizált FastAPI backend dokumentumfeltöltéssel és PostgreSQL adatbázissal."
+      },
+      {
+        id: "ml",
+        phase: "2. fázis",
+        title: "ML és matek minimum",
+        short: "Statisztika, metrikák, klasszikus ML és modellezési gondolkodás.",
+        tag: "4–6 hét",
+        color: "#34d399",
+        x: 820,
+        y: 280,
+        progress: 2,
+        summary: "Itt szerzed meg azt az elméleti alapot, ami segít megérteni, mikor jó vagy rossz egy modell, és hogyan mérhető objektíven.",
+        description: [
+          "Az AI engineering gyakran előre tanított modellek alkalmazásáról szól, de ettől még értened kell a modellezés alaplogikáját. Ha nem tudod, mi az overfitting, hogyan működik a train/test split, vagy mit jelent a precision és recall, akkor nehéz lesz eldönteni, hogy egy AI-rendszer valóban javult-e.",
+          "A matekban nem az akadémiai mélység a cél, hanem a használható intuíció: vektorok, mátrixok, koszinusz hasonlóság, eloszlások, veszteségfüggvények és optimalizáció. Ezek később közvetlenül visszajönnek embeddingeknél, retrievalnél és evaluationnél.",
+          "A klasszikus ML azért fontos, mert sok üzleti problémára még mindig gyorsabb, olcsóbb és megbízhatóbb egy jól mérhető scikit-learn modell, mint egy LLM. A jó AI mérnök nem mindenre generatív modellt használ, hanem választ a problémához illő technikát."
+        ],
+        skills: ["Lineáris algebra és koszinusz hasonlóság", "Valószínűség, statisztika, precision/recall/F1", "Train/test split, cross-validation", "Logistic regression, random forest, gradient boosting", "Feature engineering és baseline gondolkodás"],
+        tools: ["NumPy", "pandas", "scikit-learn", "matplotlib", "MLflow"],
+        checklist: ["Implementálj train/test splitet és cross-validationt.", "Készíts baseline modellt logistic regressionnel.", "Mérj precision, recall, F1 és confusion matrix alapján.", "Próbálj ki random forestet vagy gradient boostingot.", "Dokumentáld, melyik modell miért jobb vagy rosszabb.", "Csomagold be a modellt API mögé."],
+        project: "Support ticket classifier API metrikákkal, confusion matrixszal és Docker deployjal."
+      },
+      {
+        id: "deep-nlp",
+        phase: "3. fázis",
+        title: "Deep Learning + NLP",
+        short: "PyTorch, embeddings, attention és transformer intuíció.",
+        tag: "3–5 hét",
+        color: "#34d399",
+        x: 970,
+        y: 760,
+        progress: 3,
+        summary: "Nem kutatói mélység a cél, hanem az, hogy értsd a modern LLM-rendszerek alapfogalmait és tudj egyszerű neural pipeline-t építeni.",
+        description: [
+          "Ebben a szakaszban megismered, hogyan működik egy neurális háló tanítása és inferenciája. Nem kell saját nagy nyelvi modellt tanítanod, de értened kell, mi történik a háttérben, amikor egy modell embeddinget számol, tokeneket dolgoz fel vagy GPU-n fut.",
+          "Az NLP alapjai különösen fontosak: tokenizáció, embedding, szemantikus hasonlóság és attention nélkül nehéz jól megtervezni egy RAG rendszert. A transformer architektúrát elég intuitív szinten érteni, de tudd elmagyarázni, miért alkalmas hosszabb szöveges kontextus feldolgozására.",
+          "A gyakorlati cél egy embedding-alapú kereső megépítése. Ez közvetlen előkészítés a RAG modulhoz, mert ott ugyanez a gondolatmenet bővül dokumentumfeldolgozással, rerankinggel és LLM-válaszgenerálással."
+        ],
+        skills: ["Tensor, Dataset, DataLoader, training loop", "Backpropagation és optimizer intuíció", "Tokenization, embeddings, semantic similarity", "Attention és transformer architektúra", "GPU inference és checkpoint kezelés"],
+        tools: ["PyTorch", "Hugging Face", "sentence-transformers", "Jupyter"],
+        checklist: ["Írj egyszerű PyTorch training loopot.", "Futtass inference-t előre tanított Hugging Face modellel.", "Generálj embeddingeket több dokumentumra.", "Implementálj koszinusz hasonlóság alapú keresést.", "Készíts top-k kereső API-t.", "Mutasd meg UI-ban a találatokat és pontszámokat."],
+        project: "Semantic search engine dokumentumokra embedding alapú top-k kereséssel és egyszerű UI-val."
+      },
+      {
+        id: "llm",
+        phase: "4. fázis",
+        title: "LLM Engineering",
+        short: "Promptok, structured output, tool calling, streaming és hibakezelés.",
+        tag: "5–7 hét",
+        color: "#c084fc",
+        x: 1350,
+        y: 280,
+        progress: 4,
+        summary: "Itt tanulod meg, hogyan lesz egy LLM API-hívásból megbízható alkalmazás: sémákkal, validációval, retryjal, tracinggel és model routinggal.",
+        description: [
+          "Az LLM engineering lényege, hogy előre tanított modelleket használsz valós termékfunkciókhoz. Ide tartozik a prompt engineering, a strukturált válaszok kikényszerítése, a tool calling, a streaming, a rate limit kezelés és a költségfigyelés.",
+          "A gyakorlatban az LLM nem önmagában áll: validációs rétegre, fallback logikára, naplózásra és jól definiált sémákra van szüksége. A válaszokat nem szabad egyszerű szövegként kezelni, ha downstream rendszer használja őket; JSON schema vagy Pydantic validáció kell.",
+          "A modul végére tudnod kell olyan LLM szolgáltatást építeni, amely képes adatbázisból információt kérni, külső toolt hívni, strukturált választ adni, és kezelni azokat az eseteket, amikor a modell hibás, túl lassú vagy túl drága választ adna."
+        ],
+        skills: ["System/developer/user üzenetek", "JSON schema és Pydantic structured output", "Function calling / tool calling", "Streaming, rate limit, retry logic", "Token, latency és költségmérés"],
+        tools: ["OpenAI API", "Anthropic", "Gemini", "Mistral", "Pydantic", "httpx"],
+        checklist: ["Készíts prompt template verziózást.", "Használj structured outputot JSON schema alapján.", "Implementálj tool callingot legalább két valódi toollal.", "Adj hozzá streaming választ frontend vagy CLI felületen.", "Mérj latency-t, tokenhasználatot és költséget.", "Készíts retry/fallback logikát hibás vagy invalid válaszokra."],
+        project: "AI Operations Assistant adatbázis-lekérdezéssel, ticket létrehozással és strukturált válaszokkal."
+      },
+      {
+        id: "rag",
+        phase: "5. fázis",
+        title: "RAG rendszerek",
+        short: "Dokumentumfeldolgozás, chunking, vector DB, hybrid search és citation.",
+        tag: "5–7 hét",
+        color: "#34d399",
+        x: 1550,
+        y: 760,
+        progress: 5,
+        summary: "A vállalati AI appok jelentős része RAG. Itt tanulod meg, hogyan köss össze céges tudást LLM-mel mérhető, auditálható módon.",
+        description: [
+          "A RAG a munkaerőpiac egyik legfontosabb AI engineering készsége. A cél az, hogy a modell ne csak a saját betanított tudásából válaszoljon, hanem releváns dokumentumokat, adatbázisrekordokat vagy céges tudást kapjon kontextusként.",
+          "A jó RAG rendszer nem csak annyi, hogy dokumentumokat bedobsz egy vector database-be. Dönteni kell chunking stratégiáról, embedding modellről, keresési módról, metadata szűrésről, rerankingről, jogosultságkezelésről és citation visszaadásról. Ezek nagyban befolyásolják, hogy a rendszer pontos, gyors és auditálható lesz-e.",
+          "Ebben a modulban külön hangsúly van az evaluationön. Mérni kell, hogy a retrieval megtalálja-e a jó kontextust, a válasz hű-e a forrásokhoz, és mikor kell a rendszernek azt mondania, hogy nincs elég információ."
+        ],
+        skills: ["PDF/HTML/Markdown ingestion", "Chunking stratégiák", "Embeddings és vector search", "BM25 + dense hybrid retrieval", "Reranking, metadata filtering, citations"],
+        tools: ["Qdrant", "pgvector", "LlamaIndex", "LangChain", "OpenSearch", "Ragas"],
+        checklist: ["Építs dokumentum ingestion pipeline-t PDF/Markdown/HTML forrásokra.", "Próbálj ki legalább két chunking stratégiát.", "Tárold az embeddingeket Qdrantban vagy pgvectorban.", "Implementálj hybrid searchöt és rerankinget.", "Adj vissza citationöket a válaszokhoz.", "Készíts RAG eval datasetet és mérj relevanciát/hűséget."],
+        project: "Enterprise RAG dokumentumtár admin UI-val, citationökkel, jogosultságkezeléssel és eval datasettel."
+      },
+      {
+        id: "agents",
+        phase: "6. fázis",
+        title: "Agentic AI + MCP",
+        short: "Tool orchestration, memory, approval flow, MCP szerverek.",
+        tag: "4–6 hét",
+        color: "#c084fc",
+        x: 1850,
+        y: 450,
+        progress: 6,
+        summary: "A jó agent nem varázslat, hanem kontrollált workflow: toolokkal, állapottal, naplózással, timeouttal és emberi jóváhagyással.",
+        description: [
+          "Az agentic AI ott kezdődik, amikor a modell nem csak választ ír, hanem eszközöket hív, állapotot kezel és több lépéses feladatokat hajt végre. A jó megoldás viszont nem korlátlan autonómia, hanem szigorúan keretezett workflow.",
+          "Meg kell értened a tool schema, permission, retry, timeout, idempotencia és human-in-the-loop fogalmakat. Egy agentnek tudnia kell, mikor kérjen jóváhagyást, mikor álljon le, és hogyan dokumentálja, milyen eszközöket használt.",
+          "Az MCP azért került be a roadmapbe, mert egyre fontosabb a modellek és külső adatforrások/eszközök standardizált összekötése. A modul célja, hogy tudj egyszerű MCP szervert vagy tool gatewayt tervezni, de biztonsági korlátokkal és audit loggal."
+        ],
+        skills: ["Planner/executor és workflow minták", "Tool calling biztonságosan", "State, memory, retries, idempotencia", "Human-in-the-loop jóváhagyás", "MCP server/client alapok"],
+        tools: ["OpenAI Agents SDK", "LangGraph", "LlamaIndex Workflows", "MCP", "CrewAI", "AutoGen"],
+        checklist: ["Definiálj legalább három toolt sémával és jogosultsággal.", "Építs több lépéses workflow-t explicit állapottal.", "Adj hozzá timeoutot, retryt és hibakezelést.", "Vezess be human approval lépést veszélyes műveleteknél.", "Logold az összes tool hívást és döntési pontot.", "Készíts egyszerű MCP-kompatibilis tool integrációt vagy prototípust."],
+        project: "AI Research & Action Agent, amely keres, lekérdez, összefoglal és jóváhagyás után műveletet végez."
+      },
+      {
+        id: "llmops",
+        phase: "7. fázis",
+        title: "LLMOps / Production AI",
+        short: "Evals, monitoring, tracing, guardrails, deployment és cost control.",
+        tag: "5–7 hét",
+        color: "#c084fc",
+        x: 450,
+        y: 1030,
+        progress: 7,
+        summary: "Ez választja el a demót a terméktől. Mérés, monitoring, regressziós tesztek, költségkontroll és biztonság nélkül nincs production AI.",
+        description: [
+          "A production AI legnagyobb különbsége, hogy minden mérve és visszakövethetően működik. Nem elég, hogy egy demó látványos: tudnod kell, mennyibe kerül, mennyire gyors, milyen gyakran hibázik, és mikor romlik a minősége.",
+          "Az LLMOps magában foglalja a prompt registryt, eval pipeline-t, tracinget, token- és költségmérést, model routingot, cache-t, guardraileket és release előtti regressziós teszteket. Ez az a terület, ahol egy AI engineer mérnöki érettsége igazán látszik.",
+          "Ebben a modulban érdemes külön kezelni a biztonságot is: prompt injection, adatszivárgás, PII maszkolás, titokkezelés, jogosultsági kontrollok és audit log. Vállalati környezetben ezek nem extrák, hanem alapkövetelmények."
+        ],
+        skills: ["Golden dataset és eval runner", "Tracing, token usage, latency monitoring", "Prompt regression testing", "Prompt injection és PII védelem", "Model routing, caching, fallback"],
+        tools: ["LangSmith", "Arize Phoenix", "Helicone", "OpenTelemetry", "Grafana", "DeepEval"],
+        checklist: ["Készíts golden datasetet tipikus kérdésekből és elvárt válaszokból.", "Implementálj automatikus eval futtatást release előtt.", "Logold a promptot, választ, latency-t, tokeneket és költséget.", "Adj hozzá guardrailt prompt injection és PII kezelésre.", "Építs model routing/fallback megoldást.", "Deployold a rendszert és dokumentáld az üzemeltetést."],
+        project: "LLMOps mini platform prompt registryvel, eval dashboarddal, trace viewerrel és költségméréssel."
+      },
+      {
+        id: "multimodal",
+        phase: "8. fázis",
+        title: "Multimodal AI",
+        short: "PDF, kép, OCR, audio és dokumentumintelligencia.",
+        tag: "3–5 hét",
+        color: "#7dd3fc",
+        x: 1040,
+        y: 1080,
+        progress: 8,
+        summary: "A modern AI appok nem csak szöveggel dolgoznak. Itt megtanulod, hogyan dolgozz képekkel, PDF-ekkel, számlákkal, hanggal és táblázatokkal.",
+        description: [
+          "Sok üzleti AI feladat nem tiszta szöveggel indul, hanem PDF-fel, screenshotokkal, számlákkal, képekkel vagy hanggal. Ezért az AI engineernek értenie kell az OCR, document parsing, vision model és strukturált adatkinyerés alapjait.",
+          "A multimodalitásnál különösen fontos a validáció. Egy számla vagy szerződés feldolgozásánál nem elég, hogy a modell ad egy választ; mezőszintű ellenőrzés, confidence, emberi jóváhagyás és auditálható változtatás kell.",
+          "A modul végére olyan rendszert érdemes építeni, amely dokumentumot fogad, adatokat nyer ki, JSON-ba rendezi, adatbázisba menti, és hibás vagy bizonytalan mezőknél review folyamatot indít. Ez nagyon jól illeszkedik valós vállalati automatizálási problémákhoz."
+        ],
+        skills: ["Vision model inputok", "OCR és document parsing", "Structured extraction JSON-ba", "Human review hibás mezőknél", "Multimodal RAG alapok"],
+        tools: ["Vision LLM-ek", "Tesseract/PaddleOCR", "Unstructured", "Docling", "Whisper", "PostgreSQL"],
+        checklist: ["Dolgozz fel legalább háromféle dokumentumformátumot.", "Nyerd ki a fontos mezőket strukturált JSON-ba.", "Validáld az adatokat szabályokkal és sémával.", "Készíts human review felületet bizonytalan mezőkhöz.", "Mentsd az eredményt adatbázisba.", "Mérd a mezőszintű pontosságot."],
+        project: "Invoice & Document Intelligence rendszer számlamezők kinyerésével és validációs dashboarddal."
+      },
+      {
+        id: "finetune",
+        phase: "9. fázis",
+        title: "Fine-tuning + OSS modellek",
+        short: "LoRA, QLoRA, vLLM, Ollama, quantization és inference optimalizálás.",
+        tag: "3–5 hét",
+        color: "#34d399",
+        x: 1510,
+        y: 1080,
+        progress: 9,
+        summary: "Itt tanulod meg, mikor érdemes RAG, mikor prompt-only, és mikor fine-tuning. A cél nem kutatás, hanem praktikus modelloptimalizálás.",
+        description: [
+          "Fine-tuningra nincs mindig szükség, de értened kell, mikor indokolt. Ha friss vagy gyakran változó tudást akarsz hozzáadni, általában RAG kell. Ha viselkedést, formátumot, stílust vagy szűk domainosztályozást akarsz stabilizálni, akkor a fine-tuning lehet hasznos.",
+          "Az open-source modellek ismerete azért fontos, mert nem minden cég akar vagy tud külső API-ra támaszkodni. Tudnod kell lokálisan vagy saját szerveren futtatni modelleket, érteni a quantization, batching, GPU memória és throughput kompromisszumait.",
+          "A modul gyakorlati célja nem nagy modell tanítása, hanem összehasonlító gondolkodás: ugyanarra a problémára próbálj baseline ML-t, prompt-only LLM-et, RAG-et és fine-tuned kisebb modellt, majd mérd össze minőség, költség és latency alapján."
+        ],
+        skills: ["Instruction tuning és dataset formátumok", "LoRA/QLoRA és PEFT", "Open-source modellek futtatása", "Quantization és GPU memória", "Baseline vs fine-tuned összehasonlítás"],
+        tools: ["Hugging Face", "PEFT", "TRL", "Ollama", "vLLM", "llama.cpp"],
+        checklist: ["Készíts instruction tuning datasetet validációs résszel.", "Futtass kis LoRA/QLoRA kísérletet.", "Deployolj open-source modellt Ollama vagy vLLM segítségével.", "Mérj latency-t, throughputot és memóriahasználatot.", "Hasonlítsd össze prompt-only és fine-tuned eredményekkel.", "Dokumentáld, mikor éri meg és mikor nem a fine-tuning."],
+        project: "Domain-specific classifier összehasonlítással: klasszikus ML, prompt-only LLM, RAG és fine-tuned small model."
+      },
+      {
+        id: "portfolio",
+        phase: "10. fázis",
+        title: "Portfólió + Interjú",
+        short: "GitHub projektek, demo videók, architektúra, trade-offok és állásfelkészülés.",
+        tag: "3–4 hét",
+        color: "#fb7185",
+        x: 1900,
+        y: 900,
+        progress: 10,
+        summary: "A cél, hogy ne csak tudj építeni, hanem bizonyítani is tudd. A portfóliód mutassa meg a mérnöki gondolkodást, nem csak a látványos demót.",
+        description: [
+          "A portfólió akkor erős, ha nem csak működő demókat mutat, hanem döntéseket, trade-offokat és mérési eredményeket is. Egy recruiter vagy tech lead gyorsan látni akarja: milyen problémát oldottál meg, hogyan építetted fel, hogyan mérted, és hol vannak a korlátai.",
+          "Minden projektedhez legyen tiszta README, architektúraábra, lokális indítási útmutató, környezeti változók példája, képernyőkép vagy demo videó, valamint rövid rész arról, hogyan kezelted a hibákat, költséget, latency-t és biztonságot.",
+          "Interjúra készülj rendszertervezési szempontból is. Tudd elmagyarázni, mikor használnál RAG-et, mikor fine-tuningot, hogyan védenéd az agent toolokat, hogyan mérnéd a hallucinationt, és hogyan skáláznád a rendszert több felhasználóra."
+        ],
+        skills: ["4–6 erős GitHub projekt", "README architektúraábrával", "Demo videó és live deploy", "Metrikák, eval eredmények, cost becslés", "Interjúkérdések és rendszertervezés"],
+        tools: ["GitHub", "Docker", "Loom", "Vercel/Render/Fly.io", "Markdown", "Mermaid"],
+        checklist: ["Válassz ki 4–6 portfólióprojektet.", "Írj minden projekthez részletes README-t.", "Adj hozzá architektúraábrát és indítási útmutatót.", "Készíts rövid demo videót.", "Tegyél bele metrikákat, eval eredményeket és cost becslést.", "Gyakorold az AI system design interjúválaszokat."],
+        project: "Komplett AI engineer portfólió: RAG, agent, LLMOps, multimodal document AI és klasszikus ML projekt."
+      }
+    ];
+
+    const STORAGE_PREFIX = "aiEngineerRoadmap:";
+    const STATUS_OPTIONS = [
+      { value: "open", label: "Open" },
+      { value: "in-progress", label: "In progress" },
+      { value: "resolved", label: "Resolved" }
+    ];
+
+    function storageKey(id, type) {
+      return `${STORAGE_PREFIX}${id}:${type}`;
+    }
+
+    function getStatus(id) {
+      return localStorage.getItem(storageKey(id, "status")) || "open";
+    }
+
+    function setStatus(id, status) {
+      localStorage.setItem(storageKey(id, "status"), status);
+      const node = document.getElementById(`node-${id}`);
+      if (node) node.dataset.status = status;
+      applyFilter(activeFilter);
+      renderDetails(roadmap[activeIndex], activeIndex);
+      renderDashboard();
+    }
+
+    function getChecklistState(id) {
+      try {
+        return JSON.parse(localStorage.getItem(storageKey(id, "checks")) || "{}");
+      } catch {
+        return {};
+      }
+    }
+
+    function setChecklistItem(id, itemIndex, checked) {
+      const state = getChecklistState(id);
+      state[itemIndex] = checked;
+      localStorage.setItem(storageKey(id, "checks"), JSON.stringify(state));
+      renderDetails(roadmap[activeIndex], activeIndex);
+      renderDashboard();
+    }
+
+    function getNotes(id) {
+      return localStorage.getItem(storageKey(id, "notes")) || "";
+    }
+
+    function setNotes(id, value) {
+      localStorage.setItem(storageKey(id, "notes"), value);
+      renderDashboard();
+    }
+
+    function getCompletionStats() {
+      const totalTasks = roadmap.reduce((sum, item) => sum + item.checklist.length, 0);
+      const doneTasks = roadmap.reduce((sum, item) => {
+        const checks = getChecklistState(item.id);
+        return sum + item.checklist.filter((_, i) => checks[i]).length;
+      }, 0);
+      const statuses = roadmap.reduce((acc, item) => {
+        const status = getStatus(item.id);
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+      }, { open: 0, "in-progress": 0, resolved: 0 });
+      return {
+        totalTasks,
+        doneTasks,
+        percent: totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0,
+        statuses
+      };
+    }
+
+    function getNextAction() {
+      const inProgress = roadmap.find(item => getStatus(item.id) === "in-progress");
+      const candidate = inProgress || roadmap.find(item => getStatus(item.id) === "open") || roadmap.find(item => getStatus(item.id) !== "resolved");
+      if (!candidate) return "Minden modul lezárva. Következő lépés: frissítsd a portfóliót, készíts demo videókat és gyakorold az interjúkérdéseket.";
+      const checks = getChecklistState(candidate.id);
+      const firstOpenTask = candidate.checklist.find((_, i) => !checks[i]);
+      if (!firstOpenTask && getStatus(candidate.id) !== "resolved") {
+        return `${candidate.title}: minden részfeladat kész, állítsd a modult Resolved státuszra.`;
+      }
+      return `${candidate.title}: ${firstOpenTask || "válaszd ki a következő portfóliófejlesztési lépést."}`;
+    }
+
+    function renderDashboard() {
+      const stats = getCompletionStats();
+      dashboard.innerHTML = `
+        <h4>Tanulási dashboard</h4>
+        <div class="metric-grid">
+          <div class="metric"><strong>${stats.percent}%</strong><span>Teljes haladás</span></div>
+          <div class="metric"><strong>${stats.doneTasks}/${stats.totalTasks}</strong><span>Részfeladat</span></div>
+          <div class="metric"><strong>${stats.statuses.resolved || 0}/${roadmap.length}</strong><span>Resolved modul</span></div>
+          <div class="metric"><strong>${stats.statuses["in-progress"] || 0}</strong><span>Aktív modul</span></div>
+        </div>
+        <div class="progress-track"><div class="progress-fill" style="width:${stats.percent}%"></div></div>
+        <div class="filters">
+          ${["all", "open", "in-progress", "resolved"].map(filter => `
+            <span class="filter-btn ${activeFilter === filter ? 'active' : ''}" onclick="applyFilter('${filter}')">${filter === 'all' ? 'All' : filter}</span>
+          `).join('')}
+        </div>
+        <div class="next-action"><strong>Következő lépés</strong>${getNextAction()}</div>
+      `;
+    }
+
+    function applyFilter(filter) {
+      activeFilter = filter;
+      roadmap.forEach(item => {
+        const node = document.getElementById(`node-${item.id}`);
+        if (!node) return;
+        const visible = filter === "all" || getStatus(item.id) === filter;
+        node.classList.toggle("hidden-by-filter", !visible);
+      });
+      renderDashboard();
+    }
+
+    function exportProgress() {
+      const payload = {
+        app: "ai-engineer-roadmap",
+        version: "1.1.0",
+        exportedAt: new Date().toISOString(),
+        items: roadmap.map(item => ({
+          id: item.id,
+          status: getStatus(item.id),
+          checks: getChecklistState(item.id),
+          notes: getNotes(item.id)
+        }))
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "ai-engineer-roadmap-progress.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function importProgress(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const payload = JSON.parse(reader.result);
+          if (!Array.isArray(payload.items)) throw new Error("Invalid file");
+          payload.items.forEach(entry => {
+            if (!roadmap.some(item => item.id === entry.id)) return;
+            if (["open", "in-progress", "resolved"].includes(entry.status)) {
+              localStorage.setItem(storageKey(entry.id, "status"), entry.status);
+            }
+            if (entry.checks && typeof entry.checks === "object") {
+              localStorage.setItem(storageKey(entry.id, "checks"), JSON.stringify(entry.checks));
+            }
+            if (typeof entry.notes === "string") {
+              localStorage.setItem(storageKey(entry.id, "notes"), entry.notes);
+            }
+          });
+          roadmap.forEach(item => {
+            const node = document.getElementById(`node-${item.id}`);
+            if (node) node.dataset.status = getStatus(item.id);
+          });
+          applyFilter(activeFilter);
+          renderDetails(roadmap[activeIndex], activeIndex);
+          renderDashboard();
+        } catch (error) {
+          alert("Nem sikerült importálni a JSON fájlt. Ellenőrizd, hogy korábban exportált roadmap progress fájlt választottál-e.");
+        }
+        event.target.value = "";
+      };
+      reader.readAsText(file);
+    }
+
+    function resetProgress() {
+      if (!confirm("Biztosan törlöd az összes roadmap állapotot, pipát és jegyzetet ebből a böngészőből?")) return;
+      roadmap.forEach(item => {
+        localStorage.removeItem(storageKey(item.id, "status"));
+        localStorage.removeItem(storageKey(item.id, "checks"));
+        localStorage.removeItem(storageKey(item.id, "notes"));
+        const node = document.getElementById(`node-${item.id}`);
+        if (node) node.dataset.status = "open";
+      });
+      applyFilter("all");
+      renderDetails(roadmap[activeIndex], activeIndex);
+      renderDashboard();
+    }
+
+    const map = document.getElementById('map');
+    const details = document.getElementById('details');
+    const counter = document.getElementById('counter');
+    const dashboard = document.getElementById('dashboard');
+    let activeIndex = 0;
+    let activeFilter = "all";
+
+    function createNodes() {
+      roadmap.forEach((item, index) => {
+        const node = document.createElement('article');
+        node.className = 'node';
+        node.id = `node-${item.id}`;
+        node.style.left = `${item.x}px`;
+        node.style.top = `${item.y}px`;
+        node.style.setProperty('--node-color', item.color);
+        node.dataset.status = getStatus(item.id);
+        node.innerHTML = `
+          <span class="node-status" title="Állapot"></span>
+          <div class="index">${String(index + 1).padStart(2, '0')}</div>
+          <h2>${item.title}</h2>
+          <p>${item.short}</p>
+          <span class="tag">${item.tag}</span>
+        `;
+        node.addEventListener('click', () => focusNode(index));
+        map.appendChild(node);
+      });
+    }
+
+    function renderDetails(item, index) {
+      const bars = Array.from({ length: 10 }, (_, i) => `<span class="bar ${i <= index ? 'on' : ''}"></span>`).join('');
+      const currentStatus = getStatus(item.id);
+      const checks = getChecklistState(item.id);
+      const checkedCount = item.checklist.filter((_, i) => checks[i]).length;
+      const statusControls = STATUS_OPTIONS.map(option => `
+        <div class="status-option ${currentStatus === option.value ? 'active' : ''}" onclick="setStatus('${item.id}', '${option.value}')">
+          ${option.label}
+        </div>
+      `).join('');
+      const checklistHtml = item.checklist.map((task, i) => {
+        const done = Boolean(checks[i]);
+        return `
+          <label class="check-item ${done ? 'done' : ''}">
+            <input type="checkbox" ${done ? 'checked' : ''} onchange="setChecklistItem('${item.id}', ${i}, this.checked)" />
+            <span>${task}</span>
+          </label>
+        `;
+      }).join('');
+
+      details.innerHTML = `
+        <div class="phase">${item.phase} · ${item.tag}</div>
+        <h3>${item.title}</h3>
+        <div class="progress">${bars}</div>
+
+        <div class="section-title">Állapot</div>
+        <div class="status-row">${statusControls}</div>
+        <div class="meta-note">Az állapot és a pipák automatikusan elmentődnek a böngésző localStorage tárolójába.</div>
+
+        <p class="summary">${item.summary}</p>
+        <div class="long-description">
+          ${item.description.map(paragraph => `<p>${paragraph}</p>`).join('')}
+        </div>
+
+        <div class="section-title">Részfeladatok · ${checkedCount}/${item.checklist.length} kész</div>
+        <div class="checklist">${checklistHtml}</div>
+
+        <div class="section-title">Saját jegyzetek</div>
+        <textarea class="notes" placeholder="Írd ide a saját jegyzeteidet, elakadásaidat, linkjeidet vagy következő teendőidet..." oninput="setNotes('${item.id}', this.value)">${getNotes(item.id)}</textarea>
+        <div class="meta-note">A jegyzet is localStorage-ben mentődik. Export JSON-nal átviheted másik böngészőbe vagy gépre.</div>
+
+        <div class="section-title">Készségek</div>
+        <ul>${item.skills.map(skill => `<li>${skill}</li>`).join('')}</ul>
+
+        <div class="section-title">Ajánlott eszközök</div>
+        <ul>${item.tools.map(tool => `<li>${tool}</li>`).join('')}</ul>
+
+        <div class="section-title">Portfólióprojekt</div>
+        <div class="project-card">
+          <strong>${item.project}</strong>
+          <span>Építsd meg production-szerűen: Docker, README, tesztek, mérés és rövid demo videó.</span>
+        </div>
+      `;
+      counter.textContent = `${index + 1} / ${roadmap.length}`;
+    }
+
+    function focusNode(index) {
+      activeIndex = index;
+      const item = roadmap[index];
+      document.querySelectorAll('.node').forEach(node => node.classList.remove('active'));
+      const activeNode = document.getElementById(`node-${item.id}`);
+      activeNode.classList.add('active');
+      activeNode.dataset.status = getStatus(item.id);
+
+      const viewportCenterX = window.innerWidth > 1100 ? (window.innerWidth - 390) / 2 : window.innerWidth / 2;
+      const viewportCenterY = window.innerHeight / 2;
+      const scale = window.innerWidth > 1100 ? 1.05 : 0.78;
+      const nodeCenterX = item.x + 125;
+      const nodeCenterY = item.y + 75;
+      const tx = viewportCenterX - nodeCenterX * scale;
+      const ty = viewportCenterY - nodeCenterY * scale;
+
+      map.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+      map.style.left = '0';
+      map.style.top = '0';
+      renderDetails(item, index);
+    }
+
+    function resetView() {
+      map.style.left = '50%';
+      map.style.top = '50%';
+      map.style.transform = window.innerWidth > 1100
+        ? 'translate(-50%, -50%) scale(0.62)'
+        : 'translate(-50%, -50%) scale(0.42)';
+    }
+
+    function nextNode() {
+      focusNode((activeIndex + 1) % roadmap.length);
+    }
+
+    function prevNode() {
+      focusNode((activeIndex - 1 + roadmap.length) % roadmap.length);
+    }
+
+    window.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowRight') nextNode();
+      if (event.key === 'ArrowLeft') prevNode();
+      if (event.key === 'Escape') resetView();
+    });
+
+    window.addEventListener('resize', () => focusNode(activeIndex));
+
+    createNodes();
+    renderDashboard();
+    applyFilter("all");
+    focusNode(0);
+  </script>
+</body>
+</html>
